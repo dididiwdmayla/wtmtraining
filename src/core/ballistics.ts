@@ -1,8 +1,21 @@
-import type { Ammo, EstadoAlvo, EstadoAtirador, SolucaoDeTiro, Vec3 } from './types.js';
+import type {
+  Ammo,
+  EstadoAlvo,
+  EstadoAtirador,
+  EstadoProjetil,
+  SolucaoDeTiro,
+  Vec3,
+} from './types.js';
 
 export const G = 9.81;
 
 export const sub = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x - b.x, y: a.y - b.y, z: a.z - b.z });
+export const soma = (a: Vec3, b: Vec3): Vec3 => ({ x: a.x + b.x, y: a.y + b.y, z: a.z + b.z });
+export const escalar = (a: Vec3, fator: number): Vec3 => ({
+  x: a.x * fator,
+  y: a.y * fator,
+  z: a.z * fator,
+});
 export const dot = (a: Vec3, b: Vec3) => a.x * b.x + a.y * b.y + a.z * b.z;
 export const norma = (a: Vec3) => Math.sqrt(dot(a, a));
 export const normalizar = (a: Vec3): Vec3 => {
@@ -14,6 +27,71 @@ export const cruz = (a: Vec3, b: Vec3): Vec3 => ({
   y: a.z * b.x - a.x * b.z,
   z: a.x * b.y - a.y * b.x,
 });
+
+/**
+ * Cria um projétil no referencial do mundo.
+ *
+ * A flecha deixa a boca com `v0` na direção do cano E com a velocidade que
+ * o casco já tinha. É a forma cinemática da mesma velocidade relativa usada
+ * por `solucaoDeTiro`: alvo parado e atirador indo para a direita exige mirar
+ * para a esquerda porque a flecha continua para a direita durante o voo.
+ *
+ * O ATGM já é modelado pelo núcleo como guiado (lead zero para o atirador),
+ * portanto ele não recebe essa componente livre de casco.
+ */
+export function criarProjetil(
+  origem: Vec3,
+  mira: Vec3,
+  velocidadeAtirador: Vec3,
+  municao: Ammo,
+): EstadoProjetil {
+  const velocidadeDeSaida = escalar(normalizar(mira), municao.v0);
+  const velocidadeHerdada = municao.tipo === 'ATGM' ? { x: 0, y: 0, z: 0 } : velocidadeAtirador;
+
+  return {
+    posicao: { ...origem },
+    velocidade: soma(velocidadeDeSaida, velocidadeHerdada),
+    tempoVoo: 0,
+    distanciaPercorrida: 0,
+  };
+}
+
+/**
+ * Avança a trajetória física uma vez. A render não integra balística: ela
+ * chama esta função e converte o estado retornado para a cena.
+ */
+export function avancarProjetil(
+  projetil: EstadoProjetil,
+  municao: Ammo,
+  dt: number,
+): EstadoProjetil {
+  if (dt <= 0) return { ...projetil, posicao: { ...projetil.posicao }, velocidade: { ...projetil.velocidade } };
+
+  const velocidade = projetil.velocidade;
+  const rapidez = norma(velocidade);
+  let aceleracao: Vec3 = { x: 0, y: 0, z: 0 };
+
+  if (municao.tipo === 'APFSDS') {
+    // dv/dt = -k |v| v: o mesmo arrasto quadrático de `tempoDeVoo`.
+    aceleracao = escalar(velocidade, -municao.arrasto * rapidez);
+    aceleracao.y -= G;
+  } else if (municao.aceleracao && rapidez < municao.v0) {
+    // ATGM é guiado e não cai; ele só recupera velocidade até o cruzeiro.
+    aceleracao = escalar(normalizar(velocidade), municao.aceleracao);
+  }
+
+  const velocidadeSeguinte = soma(velocidade, escalar(aceleracao, dt));
+  // Média das velocidades: preserva a queda de 1/2·g·t² e não introduz
+  // uma aproximação diferente daquela exposta pelo núcleo.
+  const deslocamento = escalar(soma(velocidade, velocidadeSeguinte), dt * 0.5);
+
+  return {
+    posicao: soma(projetil.posicao, deslocamento),
+    velocidade: velocidadeSeguinte,
+    tempoVoo: projetil.tempoVoo + dt,
+    distanciaPercorrida: projetil.distanciaPercorrida + norma(deslocamento),
+  };
+}
 
 /** Converte um deslocamento lateral a uma distância para erro angular. */
 export const paraMrad = (deslocamento: number, distancia: number) =>
@@ -32,22 +110,18 @@ export const mradParaMetros = (mrad: number, distancia: number) =>
  */
 export function tempoDeVoo(distancia: number, municao: Ammo, dt = 0.001): number {
   if (distancia <= 0) return 0;
-  let v = municao.v0;
-  let s = 0;
-  let t = 0;
+  let projetil = criarProjetil(
+    { x: 0, y: 0, z: 0 },
+    { x: 0, y: 0, z: 1 },
+    { x: 0, y: 0, z: 0 },
+    municao,
+  );
   const limite = 30; // segundos; trava de segurança
-  while (s < distancia && t < limite) {
-    // ATGM acelera até a velocidade de cruzeiro em vez de só desacelerar.
-    if (municao.tipo === 'ATGM' && municao.aceleracao && v < municao.v0) {
-      v += municao.aceleracao * dt;
-    } else {
-      v -= municao.arrasto * v * v * dt;
-    }
-    if (v <= 0) break;
-    s += v * dt;
-    t += dt;
+  while (projetil.posicao.z < distancia && projetil.tempoVoo < limite) {
+    projetil = avancarProjetil(projetil, municao, dt);
+    if (projetil.velocidade.z <= 0) break;
   }
-  return t;
+  return projetil.tempoVoo;
 }
 
 /** Queda por gravidade no tempo de voo. ATGM guiado não cai. */
