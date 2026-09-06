@@ -5,15 +5,17 @@ import { criarCaixa, criarCano } from './vehicle.js';
 
 const GRAUS = Math.PI / 180;
 
-/**
- * Quanto de ângulo a mira pode ficar "devendo" ao dedo. Sem este teto,
- * um arrasto rápido acumula meia volta e a torre continua girando
- * sozinha depois que o dedo parou.
- */
-const PENDENCIA_MAX_RAD = 35 * GRAUS;
-
 const COR_CASCO = 0x44513a;
 const COR_TORRE = 0x4f5c44;
+
+/**
+ * Ergonomia da torre, vinda de `data/controles.json`. O teto de
+ * velocidade angular é do veículo; isto aqui é o quanto o comando pode
+ * correr na frente dela.
+ */
+export interface ControleTorre {
+  pendenciaMaxGraus: number;
+}
 
 /** O que o jogador pede num quadro. Ângulos em radianos. */
 export interface ComandoBlindado {
@@ -62,8 +64,16 @@ export interface Blindado {
  * relativo é que muda. Sem isso não existe treino de mira — a mira
  * andaria sozinha toda vez que o casco corrigisse a direção.
  */
-export function criarBlindado(veiculo: Veiculo, inicial: { x: number; z: number; guinada: number }): Blindado {
+export function criarBlindado(
+  veiculo: Veiculo,
+  inicial: { x: number; z: number; guinada: number },
+  controle: ControleTorre,
+): Blindado {
   const envelopes = caixasDoVeiculo(veiculo);
+  // Teto do que a mira pode ficar "devendo" ao dedo. Sem ele, um
+  // arrasto rápido acumula meia volta e a torre segue girando sozinha
+  // depois que o dedo parou — isso, sim, é atraso entre dedo e imagem.
+  const pendenciaMax = controle.pendenciaMaxGraus * GRAUS;
 
   const casco = new THREE.Group();
   casco.name = 'casco';
@@ -141,7 +151,12 @@ export function criarBlindado(veiculo: Veiculo, inicial: { x: number; z: number;
       casco.rotation.y = estado.guinadaCasco;
 
       // --- torre: guinada de mundo, com teto de velocidade ---
-      guinadaPedida = limitarPendencia(guinadaPedida + comando.guinadaTorre, estado.guinadaTorre);
+      guinadaPedida =
+        estado.guinadaTorre +
+        travar(
+          diferencaAngular(guinadaPedida + comando.guinadaTorre, estado.guinadaTorre),
+          pendenciaMax,
+        );
       const passoTorre = veiculo.torre.guinadaGrausPorS * GRAUS * dt;
       estado.guinadaTorre += travar(diferencaAngular(guinadaPedida, estado.guinadaTorre), passoTorre);
       // O relativo é consequência: o casco virou, a mira ficou onde estava.
@@ -188,8 +203,4 @@ function diferencaAngular(a: number, b: number): number {
   if (d > Math.PI) d -= Math.PI * 2;
   if (d <= -Math.PI) d += Math.PI * 2;
   return d;
-}
-
-function limitarPendencia(pedida: number, atual: number): number {
-  return atual + travar(diferencaAngular(pedida, atual), PENDENCIA_MAX_RAD);
 }

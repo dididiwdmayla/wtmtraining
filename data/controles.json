@@ -1,0 +1,30 @@
+{
+  "fovReferenciaGraus": 55,
+  "guinada": {
+    "ganhoLento": 0.0008,
+    "ganhoRapido": 0.0075,
+    "velocidadeLentaPxS": 90,
+    "velocidadeRapidaPxS": 1600,
+    "expoente": 1.6
+  },
+  "elevacao": {
+    "ganhoLento": 0.00035,
+    "ganhoRapido": 0.0026,
+    "velocidadeLentaPxS": 90,
+    "velocidadeRapidaPxS": 1600,
+    "expoente": 1.6
+  },
+  "zoom": {
+    "fovMaxGraus": 12,
+    "fovMinGraus": 1.5,
+    "passoRoda": 1.15,
+    "passoTecla": 1.4
+  },
+  "torre": {
+    "pendenciaMaxGraus": 20
+  },
+  "joystick": {
+    "raioPx": 68,
+    "zonaMorta": 0.12
+  }
+}
