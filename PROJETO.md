@@ -52,6 +52,41 @@ desalinham em silêncio e o treino passa a ensinar a coisa errada.
 Sem textura fotográfica. Cor chapada e luz direcional leem inclinação de
 blindagem melhor que realismo.
 
+A leitura visual é simplificada em caixas — um caixote para o casco, um
+menor para a torre, um cilindro para o cano — derivadas dos cantos das
+próprias placas e das caixas dos módulos. É simplificação de leitura, não
+segunda fonte de verdade: a colisão e a espessura continuam saindo das
+placas do JSON, que seguem no grafo da cena para o raycast.
+
+## Modelo de dois corpos
+
+O veículo do jogador não orbita: ele é casco + torre + canhão.
+
+- **Casco** — preso ao plano do chão, joystick virtual na metade
+  esquerda. Acelera, freia, dá ré e gira sobre o próprio eixo com
+  velocidade angular limitada.
+- **Torre** — filha do casco na hierarquia, mas a guinada que o jogador
+  comanda é a do **mundo**, por arraste na metade direita. Se o casco
+  gira, a torre segura a mira onde estava e o ângulo relativo é que
+  muda. Sem isso não há treino: a mira andaria sozinha a cada correção
+  de direção.
+- **Canhão** — filho da torre, só elevação e depressão, dentro do
+  limite do veículo.
+
+Torre e canhão têm teto de velocidade de rotação. A mira tem inércia de
+propósito: ela não gruda no dedo.
+
+Duas câmeras, alternadas por botão: terceira pessoa (filha da torre,
+atrás e acima) e mira (filha do canhão, na origem dele, FOV estreito).
+**O raycast do tiro parte sempre da boca do cano**, nas duas câmeras.
+Trocar de câmera não muda uma vírgula da balística — se o tiro saísse da
+câmera, o treino ensinaria a mirar com os olhos, não com o canhão.
+
+Cada placa e cada módulo de `data/vehicles/*.json` declara a que parte
+pertence (`"parte": "casco" | "torre"`). Os números de movimento
+(`dinamica`, `torre`, `canhao`) também vêm do JSON, pela mesma razão que
+os de blindagem: ajuste fino é edição de dado, não refactor.
+
 ## Unidades
 
 | grandeza    | unidade                        |
