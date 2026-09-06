@@ -15,7 +15,11 @@ import { ALVO_DISTANCIA_M, criarCameras } from './render/camera.js';
 import { criarControles, type ConfiguracaoControles } from './render/input.js';
 import { criarClarao } from './render/flash.js';
 import { criarSons } from './render/audio.js';
-import { dispararDoCanhao, distanciaNaLinha } from './render/shot.js';
+import {
+  criarProjetilRenderizado,
+  distanciaNaLinha,
+  type ProjetilRenderizado,
+} from './render/shot.js';
 import { marcarImpacto } from './render/decals.js';
 import {
   createResultBanner,
@@ -76,7 +80,9 @@ window.addEventListener('pointerdown', () => sons.destravar(), { once: true });
 
 const origem = new THREE.Vector3();
 const direcao = new THREE.Vector3();
+const velocidadeAtirador = new THREE.Vector3();
 const pontoDeMira = new THREE.Vector3();
+const projeteis = new Set<ProjetilRenderizado>();
 
 const botaoCamera = criarBotao('câmera: 3ª pessoa', {
   top: 'max(12px, env(safe-area-inset-top))',
@@ -118,22 +124,46 @@ window.addEventListener('keydown', (ev) => {
 /**
  * O tiro. Não há condição nenhuma sobre o estado do casco: atirar em
  * movimento é o objeto do treino, e o núcleo já decide o resto.
- * Som e clarão saem antes do raycast para caírem no mesmo quadro.
+ * Som e clarão saem no quadro do disparo; impacto só sai quando a flecha
+ * cruza uma placa durante o voo.
  */
 function atirar(): void {
   blindado.linhaDeTiro(origem, direcao);
+  blindado.velocidadeMundo(velocidadeAtirador);
   sons.disparo();
   clarao.disparar();
   claraoDeTela.disparar();
 
-  const impacto = dispararDoCanhao(origem, direcao, alvo, veiculo, municao);
-  if (!impacto) {
-    banner.mostrar('ERROU');
-    return;
-  }
-  banner.mostrar(formatarResultado(impacto.resultado, veiculo));
-  if (impacto.marca) {
-    marcarImpacto(impacto.marca.objeto, impacto.marca.ponto, impacto.marca.normal);
+  const projetil = criarProjetilRenderizado(
+    origem,
+    direcao,
+    velocidadeAtirador,
+    alvo,
+    veiculo,
+    municao,
+  );
+  scene.add(projetil.objeto);
+  projeteis.add(projetil);
+}
+
+function atualizarProjeteis(dt: number): void {
+  for (const projetil of projeteis) {
+    const desfecho = projetil.atualizar(dt);
+    if (!desfecho) continue;
+
+    projeteis.delete(projetil);
+    scene.remove(projetil.objeto);
+    projetil.destruir();
+
+    if (desfecho === 'errou') {
+      banner.mostrar('ERROU');
+      continue;
+    }
+
+    banner.mostrar(formatarResultado(desfecho.resultado, veiculo));
+    if (desfecho.marca) {
+      marcarImpacto(desfecho.marca.objeto, desfecho.marca.ponto, desfecho.marca.normal);
+    }
   }
 }
 
@@ -169,6 +199,7 @@ function animar(): void {
   blindado.atualizar(dt, controles.ler());
   blindado.linhaDeTiro(origem, direcao);
   clarao.atualizar(dt);
+  atualizarProjeteis(dt);
 
   const camera = cameras.ativa();
   atualizarReticula(camera);

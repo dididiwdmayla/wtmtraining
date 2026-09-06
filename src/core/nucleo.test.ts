@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  avancarProjetil,
+  criarProjetil,
   paraMrad,
   penetracaoNaDistancia,
   queda,
@@ -121,6 +123,44 @@ describe('solução de tiro — o coração do treino', () => {
   it('míssil guiado não pede antecipação do jogador', () => {
     const s = solucaoDeTiro(parado, alvoCruzando, missil);
     expect(s.leadHorizontalMrad).toBe(0);
+  });
+});
+
+describe('trajetória real do projétil', () => {
+  it('herda o movimento lateral do casco durante todo o voo', () => {
+    // Este teste não olha só o lead calculado: avança a flecha como a render
+    // faz. Com o cano exatamente no centro de um alvo parado, a flecha passa
+    // à direita porque saiu com os 14 m/s do casco.
+    const atiradorLateral: EstadoAtirador = {
+      ...parado,
+      velocidade: { x: 14, y: 0, z: 0 },
+    };
+    const alvoParado: EstadoAlvo = {
+      posicao: { x: 0, y: 0, z: 1000 },
+      velocidade: { x: 0, y: 0, z: 0 },
+      guinada: 0,
+    };
+    const voo = tempoDeVoo(1000, flecha);
+    let projetil = criarProjetil(
+      atiradorLateral.posicao,
+      atiradorLateral.mira,
+      atiradorLateral.velocidade,
+      flecha,
+    );
+
+    // Cruzar o plano do alvo é o instante do impacto neste cenário simples.
+    while (projetil.posicao.z < alvoParado.posicao.z) {
+      projetil = avancarProjetil(projetil, flecha, 0.001);
+    }
+
+    const deslocamentoEsperado = atiradorLateral.velocidade.x * voo;
+    expect(voo).toBeGreaterThan(0.6);
+    expect(voo).toBeLessThan(0.7);
+    expect(projetil.tempoVoo).toBeCloseTo(voo, 2);
+    expect(projetil.posicao.x).toBeGreaterThan(0);
+    expect(projetil.posicao.x).toBeGreaterThan(deslocamentoEsperado * 0.97);
+    expect(projetil.posicao.x).toBeLessThan(deslocamentoEsperado * 1.01);
+    expect(projetil.posicao.z).toBeGreaterThanOrEqual(alvoParado.posicao.z);
   });
 });
 

@@ -158,6 +158,23 @@ export interface SolucaoDeTiro {
   velocidadeLateralRelativa: number;
 }
 
+/**
+ * Estado físico de um projétil já disparado.
+ *
+ * É deliberadamente independente de three.js para que a trajetória que a
+ * render encena seja a mesma que os testes verificam. `velocidade` é a
+ * velocidade no mundo: para uma flecha ela já inclui a componente herdada
+ * do casco no instante do disparo.
+ */
+export interface EstadoProjetil {
+  posicao: Vec3;
+  velocidade: Vec3;
+  /** Tempo transcorrido desde a saída da boca do cano, em segundos. */
+  tempoVoo: number;
+  /** Comprimento percorrido pela trajetória, em metros. */
+  distanciaPercorrida: number;
+}
+
 export type ResultadoImpacto =
   | { tipo: 'errou'; erroHorizontalMrad: number; erroVerticalMrad: number }
   | { tipo: 'ricochete'; placaId: string; anguloImpacto: number }

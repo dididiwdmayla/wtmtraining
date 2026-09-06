@@ -53,6 +53,8 @@ export interface Blindado {
   atualizar(dt: number, comando: ComandoBlindado): void;
   /** Origem e direção do tiro, em coordenadas de mundo. */
   linhaDeTiro(origem: THREE.Vector3, direcao: THREE.Vector3): void;
+  /** Velocidade instantânea do casco no referencial do mundo, em m/s. */
+  velocidadeMundo(destino: THREE.Vector3): void;
 }
 
 /**
@@ -177,6 +179,14 @@ export function criarBlindado(
     linhaDeTiro(origem, direcao) {
       boca.getWorldPosition(origem);
       direcao.set(0, 0, 1).applyQuaternion(boca.getWorldQuaternion(new THREE.Quaternion()));
+    },
+
+    velocidadeMundo(destino) {
+      destino.set(
+        Math.sin(estado.guinadaCasco) * estado.velocidade,
+        0,
+        Math.cos(estado.guinadaCasco) * estado.velocidade,
+      );
     },
   };
 }
