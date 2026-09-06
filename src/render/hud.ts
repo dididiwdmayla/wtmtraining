@@ -212,3 +212,51 @@ export function criarVersao(texto: string): HTMLElement {
   document.body.appendChild(el);
   return el;
 }
+
+export interface BarraDeBotoes {
+  /** Adiciona um botão ao fim da coluna e devolve o elemento. */
+  adicionar(texto: string): HTMLButtonElement;
+}
+
+/**
+ * Coluna de botões no canto superior direito.
+ *
+ * Existe porque a lista cresceu — câmera, módulos, munição, tela cheia,
+ * ajustes — e posicionar cada um por `top` calculado à mão erra em
+ * paisagem de celular, que é onde o app roda. O flex resolve e o
+ * `safe-area-inset` mantém tudo fora do entalhe.
+ */
+export function criarBarraDeBotoes(): BarraDeBotoes {
+  const barra = document.createElement('div');
+  barra.style.cssText = [
+    'position: fixed',
+    'z-index: 10',
+    'top: max(12px, env(safe-area-inset-top))',
+    'right: max(12px, env(safe-area-inset-right))',
+    'display: flex',
+    'flex-direction: column',
+    'align-items: flex-end',
+    'gap: 6px',
+  ].join(';');
+  document.body.appendChild(barra);
+
+  return {
+    adicionar(texto) {
+      const el = document.createElement('button');
+      el.type = 'button';
+      el.textContent = texto;
+      el.style.cssText = [
+        'padding: 7px 11px',
+        'font: 11px ui-monospace, monospace',
+        'background: #10140f',
+        'color: #cfe3cf',
+        'border: 1px solid #3a4a3a',
+        'border-radius: 6px',
+        'touch-action: manipulation',
+        'white-space: nowrap',
+      ].join(';');
+      barra.appendChild(el);
+      return el;
+    },
+  };
+}
