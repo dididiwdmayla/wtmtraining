@@ -16,6 +16,13 @@
 
 export type Vec3 = { x: number; y: number; z: number };
 
+/**
+ * Modelo de dois corpos: o casco anda no plano do chão, a torre gira
+ * por cima dele. Cada placa e cada módulo pertence a um dos dois — é
+ * isto que permite a torre manter a mira no mundo enquanto o casco vira.
+ */
+export type ParteVeiculo = 'casco' | 'torre';
+
 /** APFSDS = flecha cinética. ATGM = míssil guiado. */
 export type AmmoKind = 'APFSDS' | 'ATGM';
 
@@ -43,6 +50,8 @@ export interface Ammo {
 /** Uma placa de blindagem. Também é o que a render desenha. */
 export interface Placa {
   id: string;
+  /** A que corpo a placa pertence. */
+  parte: ParteVeiculo;
   /** Centro da placa, em coordenadas locais do veículo. */
   centro: Vec3;
   /** Largura e altura da placa no seu próprio plano. */
@@ -58,11 +67,51 @@ export interface Placa {
  */
 export interface Modulo {
   id: string;
+  /** A que corpo o módulo pertence. */
+  parte: ParteVeiculo;
   tipo: 'municao' | 'motor' | 'transmissao' | 'tripulante' | 'culatra' | 'combustivel';
   centro: Vec3;
   tamanho: Vec3;
   /** Peso na pontuação. Munição vale mais que combustível. */
   valor: number;
+}
+
+/** Como o casco se move. Nenhum destes números vive no código. */
+export interface DinamicaCasco {
+  /** m/s, à frente. */
+  velocidadeMax: number;
+  /** m/s, à ré. */
+  velocidadeMaxRe: number;
+  /** m/s², acelerando. */
+  aceleracao: number;
+  /** m/s², freando. */
+  frenagem: number;
+  /** m/s², desaceleração natural sem acelerador. */
+  atrito: number;
+  /** graus/s, giro do casco sobre o próprio eixo. */
+  guinadaGrausPorS: number;
+}
+
+/** A torre é o segundo corpo: guinada própria, com teto de velocidade. */
+export interface Torre {
+  /** graus/s. É o que dá inércia à mira: a torre não gruda no dedo. */
+  guinadaGrausPorS: number;
+}
+
+/** O canhão é filho da torre: só eleva e deprime. */
+export interface Canhao {
+  /** Articulação, em coordenadas locais do veículo. */
+  pivo: Vec3;
+  /** m, do pivô à boca. É de onde o tiro sai. */
+  comprimento: number;
+  /** m. */
+  raio: number;
+  /** graus acima da horizontal. */
+  elevacaoMaxGraus: number;
+  /** graus abaixo da horizontal. */
+  depressaoMaxGraus: number;
+  /** graus/s. */
+  grausPorS: number;
 }
 
 export interface Veiculo {
@@ -72,6 +121,9 @@ export interface Veiculo {
   modulos: Modulo[];
   /** Altura do centro de massa, usada pela render e pela mira. */
   alturaCentro: number;
+  dinamica: DinamicaCasco;
+  torre: Torre;
+  canhao: Canhao;
 }
 
 /** Estado do alvo num instante. */
