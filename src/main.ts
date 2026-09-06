@@ -1,28 +1,67 @@
 /**
- * Ponto de entrada. Por enquanto só prova que o núcleo está vivo
- * e que o ciclo de build funciona no celular.
- *
- * A cena three.js entra aqui, na tarefa da camada de render.
+ * Ponto de entrada. Cena mínima de inspeção do veículo-alvo: nada de
+ * balística aqui, isso é do núcleo.
  */
-import apfsds from '../data/ammo/apfsds.json';
-import { solucaoDeTiro, type Ammo } from './core/index.js';
+import * as THREE from 'three';
+import veiculoJson from '../data/vehicles/mbt-generico.json';
+import type { Veiculo } from './core/index.js';
+import { createScene } from './render/scene.js';
+import { buildVehicleMesh } from './render/vehicle.js';
+import { createCamera, createOrbitControls } from './render/camera.js';
 
-const municao = apfsds as Ammo;
-
-const solucao = solucaoDeTiro(
-  { posicao: { x: 0, y: 0, z: 0 }, velocidade: { x: 0, y: 0, z: 0 }, mira: { x: 0, y: 0, z: 1 } },
-  { posicao: { x: 0, y: 0, z: 1200 }, velocidade: { x: 12, y: 0, z: 0 }, guinada: 0 },
-  municao,
-);
+const veiculo = veiculoJson as Veiculo;
 
 const app = document.querySelector<HTMLDivElement>('#app');
-if (app) {
-  app.style.cssText = 'color:#cfe3cf;font:14px/1.6 ui-monospace,monospace;padding:24px';
-  app.innerHTML = `
-    <p>Núcleo online.</p>
-    <p>Alvo a 1200 m cruzando a 12 m/s, atirador parado:</p>
-    <p>tempo de voo ${solucao.tempoVoo.toFixed(3)} s</p>
-    <p>lead horizontal ${solucao.leadHorizontalMrad.toFixed(2)} mrad</p>
-    <p>queda ${solucao.quedaM.toFixed(2)} m</p>
-  `;
+if (!app) throw new Error('#app não encontrado');
+app.innerHTML = '';
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(window.innerWidth, window.innerHeight);
+app.appendChild(renderer.domElement);
+
+const scene = createScene();
+
+const veiculoMesh = buildVehicleMesh(veiculo);
+scene.add(veiculoMesh.group);
+
+const camera = createCamera(window.innerWidth / window.innerHeight);
+const alvo = new THREE.Vector3(0, veiculo.alturaCentro, 0);
+const controls = createOrbitControls(camera, renderer.domElement, alvo);
+
+const botaoDebug = document.createElement('button');
+botaoDebug.type = 'button';
+botaoDebug.textContent = 'módulos: off';
+botaoDebug.style.cssText = [
+  'position: fixed',
+  'top: max(12px, env(safe-area-inset-top))',
+  'left: 12px',
+  'z-index: 10',
+  'padding: 10px 16px',
+  'font: 14px ui-monospace, monospace',
+  'background: #10140f',
+  'color: #cfe3cf',
+  'border: 1px solid #3a4a3a',
+  'border-radius: 6px',
+  'touch-action: manipulation',
+].join(';');
+let modulosVisiveis = false;
+botaoDebug.addEventListener('click', () => {
+  modulosVisiveis = !modulosVisiveis;
+  veiculoMesh.setModulesVisible(modulosVisiveis);
+  botaoDebug.textContent = `módulos: ${modulosVisiveis ? 'on' : 'off'}`;
+});
+document.body.appendChild(botaoDebug);
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animar(): void {
+  requestAnimationFrame(animar);
+  controls.update();
+  renderer.render(scene, camera);
 }
+animar();
