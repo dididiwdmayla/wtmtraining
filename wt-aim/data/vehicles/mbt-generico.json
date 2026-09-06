@@ -1,0 +1,22 @@
+{
+  "id": "mbt-generico",
+  "nome": "MBT generico",
+  "alturaCentro": 1.2,
+  "placas": [
+    { "id": "glacis", "centro": { "x": 0, "y": 0.7, "z": 3.2 }, "tamanho": { "largura": 3.4, "altura": 1.4 }, "normal": { "x": 0, "y": 0.42, "z": 0.91 }, "espessuraMm": 220 },
+    { "id": "torre-frontal", "centro": { "x": 0, "y": 2.0, "z": 1.4 }, "tamanho": { "largura": 2.6, "altura": 0.9 }, "normal": { "x": 0, "y": 0.17, "z": 0.98 }, "espessuraMm": 480 },
+    { "id": "manto", "centro": { "x": 0, "y": 2.0, "z": 2.0 }, "tamanho": { "largura": 0.9, "altura": 0.7 }, "normal": { "x": 0, "y": 0, "z": 1 }, "espessuraMm": 300 },
+    { "id": "torre-teto-frontal", "centro": { "x": 0, "y": 2.5, "z": 1.0 }, "tamanho": { "largura": 2.4, "altura": 0.8 }, "normal": { "x": 0, "y": 0.97, "z": 0.24 }, "espessuraMm": 60 },
+    { "id": "lateral-casco", "centro": { "x": 1.7, "y": 0.9, "z": 0 }, "tamanho": { "largura": 6.5, "altura": 1.0 }, "normal": { "x": 1, "y": 0, "z": 0 }, "espessuraMm": 80 },
+    { "id": "traseira", "centro": { "x": 0, "y": 1.0, "z": -3.2 }, "tamanho": { "largura": 3.2, "altura": 1.2 }, "normal": { "x": 0, "y": 0, "z": -1 }, "espessuraMm": 40 }
+  ],
+  "modulos": [
+    { "id": "municao-casco", "tipo": "municao", "centro": { "x": -0.6, "y": 0.8, "z": 1.2 }, "tamanho": { "x": 0.8, "y": 0.9, "z": 1.2 }, "valor": 100 },
+    { "id": "municao-torre", "tipo": "municao", "centro": { "x": 0, "y": 2.1, "z": -0.6 }, "tamanho": { "x": 1.6, "y": 0.7, "z": 0.9 }, "valor": 100 },
+    { "id": "culatra", "tipo": "culatra", "centro": { "x": 0, "y": 2.0, "z": 0.6 }, "tamanho": { "x": 0.6, "y": 0.6, "z": 1.2 }, "valor": 70 },
+    { "id": "artilheiro", "tipo": "tripulante", "centro": { "x": 0.5, "y": 2.0, "z": 0.9 }, "tamanho": { "x": 0.5, "y": 0.9, "z": 0.5 }, "valor": 60 },
+    { "id": "piloto", "tipo": "tripulante", "centro": { "x": 0.4, "y": 0.9, "z": 2.4 }, "tamanho": { "x": 0.5, "y": 0.9, "z": 0.5 }, "valor": 55 },
+    { "id": "motor", "tipo": "motor", "centro": { "x": 0, "y": 0.9, "z": -2.2 }, "tamanho": { "x": 2.6, "y": 1.2, "z": 1.8 }, "valor": 30 },
+    { "id": "transmissao", "tipo": "transmissao", "centro": { "x": 0, "y": 0.7, "z": 2.6 }, "tamanho": { "x": 2.4, "y": 0.8, "z": 0.8 }, "valor": 25 }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "id": "apfsds",
+  "nome": "APFSDS",
+  "tipo": "APFSDS",
+  "v0": 1600,
+  "arrasto": 0.00005,
+  "normalizacaoGraus": 5,
+  "ricocheteGraus": 80,
+  "penetracao": [[10, 560], [500, 545], [1000, 530], [1500, 515], [2000, 500], [3000, 470]]
+}

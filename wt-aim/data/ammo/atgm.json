@@ -1,0 +1,11 @@
+{
+  "id": "atgm",
+  "nome": "Missil guiado",
+  "tipo": "ATGM",
+  "v0": 350,
+  "arrasto": 0,
+  "aceleracao": 200,
+  "normalizacaoGraus": 0,
+  "ricocheteGraus": 88,
+  "penetracao": [[10, 600], [3000, 600]]
+}
