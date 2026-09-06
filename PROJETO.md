@@ -30,7 +30,8 @@ num número só está destruindo a informação principal.
 ```
 src/core/     números puros. Zero three.js, zero DOM.
 src/render/   three.js. Consome o núcleo, nunca calcula regra.
-data/         JSON de munições e veículos. Nenhum número no código.
+data/         JSON de munições, veículos e controles. Nenhum número no código.
+public/       o que é servido cru: áudio, ícones.
 ```
 
 Regras duras:
@@ -74,10 +75,27 @@ O veículo do jogador não orbita: ele é casco + torre + canhão.
   limite do veículo.
 
 Torre e canhão têm teto de velocidade de rotação. A mira tem inércia de
-propósito: ela não gruda no dedo.
+propósito: ela não gruda no dedo. **Essa é a única inércia do sistema.**
+Entre o dedo e o comando não há suavização, lerp nem easing: o
+deslocamento do evento de toque vira ângulo naquele mesmo evento, e o
+quadro seguinte já o aplica. Filtro sobre o input vira atraso na
+imagem, e atraso na imagem ensina a compensar o aparelho em vez do alvo.
+
+O ganho do arraste não é linear. Dedo lento entrega ganho baixo — é o
+que permite ajustar frações de mrad; dedo rápido entrega ganho alto — é
+o que permite trocar de alvo sem levantar o dedo. A transição é
+contínua e a curva inteira vive em `data/controles.json`.
+
+O ganho também cai proporcionalmente ao FOV da câmera que está na tela.
+Sem isso, a mesma sensibilidade angular que serve em terceira pessoa
+torna a mira com zoom intratável.
+
+Atirar com o casco em movimento não tem restrição nenhuma, e não pode
+ganhar uma: atirar em movimento é o objeto deste treino.
 
 Duas câmeras, alternadas por botão: terceira pessoa (filha da torre,
-atrás e acima) e mira (filha do canhão, na origem dele, FOV estreito).
+atrás e acima) e mira (filha do canhão, na origem dele, FOV estreito e
+zoom contínuo por pinça de dois dedos, entre os limites do JSON).
 **O raycast do tiro parte sempre da boca do cano**, nas duas câmeras.
 Trocar de câmera não muda uma vírgula da balística — se o tiro saísse da
 câmera, o treino ensinaria a mirar com os olhos, não com o canhão.
@@ -85,7 +103,10 @@ câmera, o treino ensinaria a mirar com os olhos, não com o canhão.
 Cada placa e cada módulo de `data/vehicles/*.json` declara a que parte
 pertence (`"parte": "casco" | "torre"`). Os números de movimento
 (`dinamica`, `torre`, `canhao`) também vêm do JSON, pela mesma razão que
-os de blindagem: ajuste fino é edição de dado, não refactor.
+os de blindagem: ajuste fino é edição de dado, não refactor. O que é
+ergonomia de tela e não propriedade do veículo — curva de ganho, zona
+morta, limites de zoom — fica em `data/controles.json`, pela mesma
+razão.
 
 ## Unidades
 
@@ -110,6 +131,9 @@ de ajustar o valor esperado.
 
 ## Fora de escopo
 
+- Botão que não exista no jogo. As exceções são a alternância de câmera
+  e o toggle de debug dos módulos, que são instrumento de treino, não
+  interface de combate.
 - Extrair asset, modelo, som, HUD ou tabela de qualquer jogo comercial.
   Valores próprios e consistentes treinam o mesmo reflexo e o projeto
   não envelhece a cada patch.
