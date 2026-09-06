@@ -1,14 +1,17 @@
 /**
- * Som de disparo.
+ * Sons de disparo, um por munição.
  *
- * Web Audio com o buffer decodificado UMA vez, no carregamento. Cada
+ * Web Audio com cada buffer decodificado UMA vez, no carregamento. Cada
  * tiro só cria um BufferSource e chama start(): o custo é de
  * microssegundos e o som sai no mesmo quadro do clarão. Um
  * `new Audio()` por tiro decodifica na hora e o atraso aparece na tela.
  */
 export interface Sons {
-  /** Dispara o som. Silencioso — e nunca lança — se o buffer não veio. */
-  disparo(): void;
+  /**
+   * Toca o som daquela munição. Silencioso — e nunca lança — se o
+   * buffer não veio ou o id não existe.
+   */
+  disparo(id: string): void;
   /**
    * Política de autoplay: o contexto nasce suspenso e só sai disso
    * dentro de um gesto do usuário. Chame no primeiro toque.
@@ -19,7 +22,8 @@ export interface Sons {
 
 const VOLUME = 0.85;
 
-export function criarSons(url: string): Sons {
+/** `fontes` é `{ id da munição: url do mp3 }`. */
+export function criarSons(fontes: Record<string, string>): Sons {
   const Contexto: typeof AudioContext | undefined =
     window.AudioContext ??
     (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
@@ -33,26 +37,29 @@ export function criarSons(url: string): Sons {
   saida.gain.value = VOLUME;
   saida.connect(contexto.destination);
 
-  let buffer: AudioBuffer | null = null;
+  const buffers = new Map<string, AudioBuffer>();
 
   // Pré-carga: busca e decodifica já, antes do primeiro tiro. O
   // contexto pode estar suspenso — decodificar não depende disso.
-  void fetch(url)
-    .then((resposta) => {
-      if (!resposta.ok) throw new Error(`áudio ${url}: ${resposta.status}`);
-      return resposta.arrayBuffer();
-    })
-    .then((dados) => contexto.decodeAudioData(dados))
-    .then((decodificado) => {
-      buffer = decodificado;
-    })
-    .catch((erro) => {
-      // Sem som é degradação aceitável; travar o treino não é.
-      console.warn('som de disparo indisponível', erro);
-    });
+  for (const [id, url] of Object.entries(fontes)) {
+    void fetch(url)
+      .then((resposta) => {
+        if (!resposta.ok) throw new Error(`áudio ${url}: ${resposta.status}`);
+        return resposta.arrayBuffer();
+      })
+      .then((dados) => contexto.decodeAudioData(dados))
+      .then((decodificado) => {
+        buffers.set(id, decodificado);
+      })
+      .catch((erro) => {
+        // Sem som é degradação aceitável; travar o treino não é.
+        console.warn(`som de disparo indisponível (${id})`, erro);
+      });
+  }
 
   return {
-    disparo() {
+    disparo(id) {
+      const buffer = buffers.get(id);
       if (!buffer) return;
       if (contexto.state !== 'running') void contexto.resume();
       const fonte = contexto.createBufferSource();

@@ -1,39 +1,12 @@
 import type { ComandoBlindado } from './tank.js';
+import type { PainelDeAjustes, ConfiguracaoMira } from './ajustes.js';
+import { anguloDoArraste, type DimensaoTela } from './sensibilidade.js';
 
-/**
- * Curva de ganho por velocidade do dedo. Dedo lento entrega ganho baixo
- * — ajuste de fração de mrad; dedo rápido entrega ganho alto — troca de
- * alvo sem levantar o dedo. A transição é contínua: não há degrau nem
- * modo escondido.
- *
- * Isto NÃO é suavização. O ganho é aplicado no próprio evento de toque,
- * sobre o deslocamento daquele evento. Nenhuma amostra é filtrada,
- * atrasada ou interpolada. A única inércia do sistema é o teto de
- * velocidade angular da torre, que é do veículo, não do input.
- */
-export interface CurvaDeGanho {
-  /** rad por px na ponta lenta da curva. */
-  ganhoLento: number;
-  /** rad por px na ponta rápida da curva. */
-  ganhoRapido: number;
-  /** px/s: abaixo disto o ganho é exatamente o lento. */
-  velocidadeLentaPxS: number;
-  /** px/s: acima disto o ganho é exatamente o rápido. */
-  velocidadeRapidaPxS: number;
-  /** Curvatura da transição. 1 = reta; >1 segura o ganho baixo por mais tempo. */
-  expoente: number;
-}
+export type { ConfiguracaoMira } from './ajustes.js';
 
 export interface ConfiguracaoControles {
-  /**
-   * FOV em que os ganhos acima foram calibrados. O ganho real é
-   * multiplicado por (fov da câmera ativa / este valor), então a
-   * sensibilidade ANGULAR cai junto com o FOV e a sensibilidade
-   * aparente na tela fica a mesma em qualquer zoom.
-   */
-  fovReferenciaGraus: number;
-  guinada: CurvaDeGanho;
-  elevacao: CurvaDeGanho;
+  /** Sensibilidade, curva de ganho e faixas dos deslizadores. */
+  mira: ConfiguracaoMira;
   zoom: {
     fovMaxGraus: number;
     fovMinGraus: number;
@@ -43,7 +16,12 @@ export interface ConfiguracaoControles {
     passoTecla: number;
   };
   torre: {
-    /** Quanto de ângulo a mira pode ficar devendo ao dedo. */
+    /**
+     * Quanto de ângulo a mira pode ficar devendo ao dedo. A torre gasta
+     * essa dívida no seu próprio teto de velocidade, então o número é
+     * literalmente "quanto tempo a mira ainda anda depois que o dedo
+     * parou": 6° contra uma torre de 30°/s são 0,2 s.
+     */
     pendenciaMaxGraus: number;
   };
   joystick: {
@@ -53,9 +31,9 @@ export interface ConfiguracaoControles {
 }
 
 /**
- * O que o input precisa saber da óptica: o FOV que está na tela — para
- * escalar o ganho — e o FOV da mira, que é o que a pinça mexe.
- * `criarCameras` satisfaz esta forma.
+ * O que o input precisa saber da óptica: o FOV VERTICAL que está na
+ * tela — `sensibilidade.ts` deriva o horizontal com a razão de aspecto
+ * — e o FOV da mira, que é o que a pinça mexe.
  */
 export interface Optica {
   fovAtivoGraus(): number;
@@ -63,15 +41,28 @@ export interface Optica {
   definirFovMiraGraus(graus: number): void;
 }
 
+/** Só o que o input consome de `tela.ts`. */
+export interface Medidor {
+  tamanho(): DimensaoTela;
+}
+
 export interface Controles {
   /**
    * Comando do quadro. CONSOME o arraste acumulado, então chame uma vez
-   * por quadro e só uma. O que sai daqui já está em radianos: o ganho
-   * foi aplicado evento a evento, no instante do toque.
+   * por quadro e só uma. O que sai daqui já está em radianos: o ângulo
+   * foi calculado evento a evento, no instante do toque.
    */
   ler(): ComandoBlindado;
   destruir(): void;
 }
+
+/**
+ * Divisor mínimo ao medir a velocidade do dedo. Eventos coalescidos
+ * podem chegar com carimbos praticamente iguais e a divisão explodiria
+ * numa velocidade que não existiu. Não é suavização: nenhuma amostra é
+ * descartada nem misturada com a vizinha, só o divisor tem piso.
+ */
+const DT_MINIMO_S = 0.0005;
 
 /**
  * Duas metades de tela, dois corpos:
@@ -82,11 +73,17 @@ export interface Controles {
  *
  * A metade direita entrega DELTA ANGULAR, não posição absoluta: quem
  * limita a velocidade de giro é o blindado, e é lá que mora a inércia.
+ *
+ * O roteamento é por `pointerId`: cada dedo entra em exatamente um
+ * papel no `pointerdown` e fica nele até levantar. Joystick e mira não
+ * disputam evento, e nenhum arraste é contado duas vezes.
  */
 export function criarControles(
   dom: HTMLElement,
   config: ConfiguracaoControles,
   optica: Optica,
+  tela: Medidor,
+  ajustes: PainelDeAjustes,
 ): Controles {
   const raio = config.joystick.raioPx;
 
@@ -140,7 +137,11 @@ export function criarControles(
   const teclas = new Set<string>();
 
   function repousar(): void {
-    centro = { x: 110, y: window.innerHeight - 110 };
+    // Com o dedo apoiado, mexer no centro seria um salto no comando —
+    // e girar o aparelho dispara `resize` no meio do gesto.
+    if (idJoystick !== null) return;
+    const { altura } = tela.tamanho();
+    centro = { x: 110, y: altura - 110 };
     ponta = { ...centro };
     desenhar();
   }
@@ -153,32 +154,36 @@ export function criarControles(
     base.style.opacity = idJoystick === null ? '0.5' : '0.9';
   }
 
-  /** Ganho da curva para a velocidade instantânea do dedo. */
-  function ganho(curva: CurvaDeGanho, velocidadePxS: number): number {
-    const faixa = curva.velocidadeRapidaPxS - curva.velocidadeLentaPxS;
-    const bruto = faixa > 0 ? (velocidadePxS - curva.velocidadeLentaPxS) / faixa : 1;
-    const t = Math.pow(Math.min(1, Math.max(0, bruto)), curva.expoente);
-    return curva.ganhoLento + (curva.ganhoRapido - curva.ganhoLento) * t;
-  }
-
   /**
-   * Uma amostra de arraste vira ângulo aqui, na hora. O ganho usa a
-   * velocidade daquela amostra e a escala usa o FOV daquele instante.
+   * Uma amostra de arraste vira ângulo aqui, na hora. A conta inteira
+   * está em `sensibilidade.ts`: fração de tela vezes o FOV daquele eixo,
+   * com a curva de ganho pela velocidade daquela amostra e os
+   * deslizadores do painel lidos neste mesmo instante.
    */
   function acumularArraste(x: number, y: number, t: number): void {
     const dx = x - dedo.x;
     const dy = y - dedo.y;
     const dt = (t - dedo.t) / 1000;
     dedo = { x, y, t };
-    if (dt > 0) velocidadeDedo = Math.hypot(dx, dy) / dt;
+    if (dt > 0) velocidadeDedo = Math.hypot(dx, dy) / Math.max(dt, DT_MINIMO_S);
 
     // Com dois dedos na tela o gesto é zoom, não guinada: o dedo que
     // mira se afasta do outro e isso não pode virar rotação.
     if (idPinca !== null) return;
 
-    const escala = optica.fovAtivoGraus() / config.fovReferenciaGraus;
-    acumulado.guinada -= dx * ganho(config.guinada, velocidadeDedo) * escala;
-    acumulado.elevacao -= dy * ganho(config.elevacao, velocidadeDedo) * escala;
+    const angulo = anguloDoArraste({
+      dx,
+      dy,
+      velocidadePxS: velocidadeDedo,
+      fovAtivoGraus: optica.fovAtivoGraus(),
+      tela: tela.tamanho(),
+      curva: config.mira.ganho,
+      zoom: config.zoom,
+      razaoVertical: config.mira.razaoVertical,
+      ajustes: ajustes.valores(),
+    });
+    acumulado.guinada += angulo.guinada;
+    acumulado.elevacao += angulo.elevacao;
   }
 
   function ampliar(fator: number): void {
@@ -186,7 +191,7 @@ export function criarControles(
   }
 
   function aoDescer(ev: PointerEvent): void {
-    if (ev.clientX < window.innerWidth / 2) {
+    if (ev.clientX < tela.tamanho().largura / 2) {
       if (idJoystick !== null) return;
       idJoystick = ev.pointerId;
       centro = { x: ev.clientX, y: ev.clientY };
@@ -236,8 +241,9 @@ export function criarControles(
     if (ev.pointerId !== idArraste) return;
 
     // Eventos coalescidos: o navegador amostra o toque mais rápido do
-    // que entrega. Ler todos preserva a velocidade real do dedo e a
-    // resposta continua sendo a do quadro corrente.
+    // que entrega. Ler todos preserva a velocidade real do dedo e faz o
+    // ângulo total do gesto não depender da taxa de quadros — o que sai
+    // daqui é a SOMA dos deslocamentos, e ela é a mesma a 30 ou 120 Hz.
     const amostras =
       typeof ev.getCoalescedEvents === 'function' ? ev.getCoalescedEvents() : [];
     if (amostras.length > 0) {
@@ -294,6 +300,7 @@ export function criarControles(
   dom.addEventListener('pointercancel', aoSubir);
   dom.addEventListener('wheel', aoRoda, { passive: false });
   window.addEventListener('resize', repousar);
+  window.addEventListener('orientationchange', repousar);
 
   const aoTeclar = (ev: KeyboardEvent) => {
     const tecla = ev.key.toLowerCase();
@@ -330,6 +337,7 @@ export function criarControles(
       dom.removeEventListener('pointercancel', aoSubir);
       dom.removeEventListener('wheel', aoRoda);
       window.removeEventListener('resize', repousar);
+      window.removeEventListener('orientationchange', repousar);
       window.removeEventListener('keydown', aoTeclar);
       window.removeEventListener('keyup', aoSoltar);
       base.remove();

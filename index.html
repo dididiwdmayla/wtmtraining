@@ -2,15 +2,71 @@
 <html lang="pt-BR">
   <head>
     <meta charset="utf-8" />
+    <!--
+      `viewport-fit=cover` põe a página por baixo do entalhe e da barra
+      de gestos; quem devolve o espaço seguro é o `env(safe-area-inset-*)`
+      de cada elemento do HUD. `interactive-widget=resizes-content` mantém
+      o viewport visual e o de layout falando a mesma língua.
+    -->
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"
+      content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
+    <!--
+      Tela cheia no celular tem dois caminhos e o app usa os dois:
+
+      1. API de tela cheia, pedida no primeiro toque (`tela.ts`). É o que
+         resolve no Android, inclusive fora do PWA instalado.
+      2. PWA instalado. O manifesto já declara `display: fullscreen`; no
+         iOS quem vale é a meta `apple-mobile-web-app-capable` abaixo,
+         porque lá o manifesto não decide isso — e a API de tela cheia
+         não existe para elemento comum no Safari do iPhone.
+
+      `black-translucent` é o que faz o conteúdo subir por baixo da barra
+      de status em vez de parar embaixo dela.
+    -->
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#0a0c0a" />
     <title>Treino de Mira</title>
     <style>
-      html, body { margin: 0; height: 100%; background: #0a0c0a; overscroll-behavior: none; }
-      canvas { display: block; touch-action: none; }
-      #app { position: fixed; inset: 0; }
+      /*
+        `position: fixed` no corpo é o que impede a rolagem elástica de
+        aparecer e, com ela, a barra de endereço voltar no meio de um
+        arraste de mira. Não existe conteúdo rolável nesta página.
+      */
+      html,
+      body {
+        margin: 0;
+        position: fixed;
+        inset: 0;
+        overflow: hidden;
+        background: #0a0c0a;
+        overscroll-behavior: none;
+        -webkit-user-select: none;
+        user-select: none;
+        -webkit-touch-callout: none;
+        -webkit-tap-highlight-color: transparent;
+      }
+      canvas {
+        display: block;
+        touch-action: none;
+      }
+      /*
+        Tamanho vem do JS: `tela.ts` mede a área visível de verdade.
+        `touch-action: none` fica aqui e no canvas, não no corpo: no
+        corpo ele valeria também para os deslizadores do painel de
+        ajustes, e deslizador precisa do próprio tratamento de toque.
+      */
+      #app {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        touch-action: none;
+      }
     </style>
   </head>
   <body>

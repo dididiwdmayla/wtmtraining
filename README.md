@@ -8,7 +8,7 @@ fraco e tracking. Roda no navegador do celular, instala como app.
 ```
 npm install
 npm run dev      # abre com --host, acessível pelo celular na rede
-npm test         # núcleo numérico, 20 testes
+npm test         # núcleo numérico e sensibilidade da mira
 ```
 
 ## Estrutura
