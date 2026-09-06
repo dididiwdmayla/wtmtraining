@@ -4,12 +4,17 @@
  */
 import * as THREE from 'three';
 import veiculoJson from '../data/vehicles/mbt-generico.json';
-import type { Veiculo } from './core/index.js';
+import municaoJson from '../data/ammo/apfsds.json';
+import type { Ammo, Veiculo } from './core/index.js';
 import { createScene } from './render/scene.js';
 import { buildVehicleMesh } from './render/vehicle.js';
 import { createCamera, createOrbitControls } from './render/camera.js';
+import { attachToqueDeTiro } from './render/input.js';
+import { marcarImpacto } from './render/decals.js';
+import { createResultBanner, formatarResultado } from './render/hud.js';
 
 const veiculo = veiculoJson as Veiculo;
+const municao = municaoJson as Ammo;
 
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) throw new Error('#app não encontrado');
@@ -28,6 +33,12 @@ scene.add(veiculoMesh.group);
 const camera = createCamera(window.innerWidth / window.innerHeight);
 const alvo = new THREE.Vector3(0, veiculo.alturaCentro, 0);
 const controls = createOrbitControls(camera, renderer.domElement, alvo);
+
+const banner = createResultBanner();
+attachToqueDeTiro(renderer, camera, veiculoMesh.group, veiculo, municao, (impacto) => {
+  banner.mostrar(formatarResultado(impacto.resultado, veiculo));
+  marcarImpacto(impacto.mesh, impacto.pontoMundo);
+});
 
 const botaoDebug = document.createElement('button');
 botaoDebug.type = 'button';
